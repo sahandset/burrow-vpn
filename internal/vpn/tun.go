@@ -1,7 +1,8 @@
 package vpn
 
 import (
-	"fmt"
+	"log"
+
 	"github.com/songgao/water"
 )
 
@@ -9,13 +10,13 @@ func CreateTUN(name string) (*water.Interface, error) {
 	config := water.Config{
 		DeviceType: water.TUN,
 	}
-	config.Name = config.Name
+	config.Name = name
 
 	ifce, err := water.New(config)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create TUN device: %w", err)
+		return nil, err
 	}
 
-	fmt.Printf("TUN device %s created\n", ifce.Name())
+	log.Println("[vpn] TUN interface created:", ifce.Name())
 	return ifce, nil
 }

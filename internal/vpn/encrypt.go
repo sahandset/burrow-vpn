@@ -4,36 +4,39 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"fmt"
+	"errors"
 	"io"
 )
 
-type Encryptor struct {
-	aead cipher.AEAD
+type Crypto struct {
+	gcm cipher.AEAD
 }
 
-func NewEncryptor(key []byte) (*Encryptor, error) {
+func NewCrypto(key []byte) (*Crypto, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("cipher init failed: %w", err)
+		return nil, err
 	}
-	aead, err := cipher.NewGCM(block)
+	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf("gcm init failed: %w", err)
+		return nil, err
 	}
-	return &Encryptor{aead}, nil
+	return &Crypto{gcm: gcm}, nil
 }
 
-func (e *Encryptor) Encrypt(plain []byte) ([]byte, error) {
-	nonce := make([]byte, e.aead.NonceSize())
+func (c *Crypto) Encrypt(plaintext []byte) ([]byte, error) {
+	nonce := make([]byte, c.gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, err
 	}
-	return e.aead.Seal(nonce, nonce, plain, nil), nil
+	return append(nonce, c.gcm.Seal(nil, nonce, plaintext, nil)...), nil
 }
 
-func (e *Encryptor) Decrypt(ciphertext []byte) ([]byte, error) {
-	nonceSize := e.aead.NonceSize()
-	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	return e.aead.Open(nil, nonce, ciphertext, nil)
+func (c *Crypto) Decrypt(ciphertext []byte) ([]byte, error) {
+	size := c.gcm.NonceSize()
+	if len(ciphertext) < size {
+		return nil, errors.New("ciphertext too short")
+	}
+	nonce := ciphertext[:size]
+	return c.gcm.Open(nil, nonce, ciphertext[size:], nil)
 }
